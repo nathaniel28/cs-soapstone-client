@@ -8,6 +8,35 @@ using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Soapstone {
+	[Serializable]
+	public class NotLoggedInException : Exception {
+		public NotLoggedInException() {}
+		public NotLoggedInException(string what) : base(what) {}
+		public NotLoggedInException(string what, Exception inner) : base(what, inner) {}
+	}
+
+	[Serializable]
+	public class RateLimitException : Exception {
+		public RateLimitException() {}
+		public RateLimitException(string what) : base(what) {}
+		public RateLimitException(string what, Exception inner) : base(what, inner) {}
+	}
+
+	[Serializable]
+	public class ParseException : Exception {
+		public ParseException() {}
+		public ParseException(string what) : base(what) {}
+		public ParseException(string what, Exception inner) : base(what, inner) {}
+	}
+
+	// don't try to recover from this one
+	// this means there's a serious bug in this namespace
+	[Serializable]
+	public class BadRequestException : Exception {
+		public BadRequestException() {}
+		public BadRequestException(string what) : base(what) {}
+		public BadRequestException(string what, Exception inner) : base(what, inner) {}
+	}
 	[StructLayout(LayoutKind.Sequential, Pack = 4)]
 	public struct Message {
 		public uint Id;
@@ -81,6 +110,7 @@ namespace Soapstone {
 		private static readonly string host = "https://128.9.29.8";
 		private static readonly byte[] publicKey = new byte[] { 48, 130, 5, 221, 48, 130, 3, 197, 160, 3, 2, 1, 2, 2, 20, 80, 172, 138, 94, 122, 114, 250, 123, 183, 95, 53, 222, 220, 213, 45, 204, 157, 22, 164, 82, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 11, 5, 0, 48, 126, 49, 11, 48, 9, 6, 3, 85, 4, 6, 19, 2, 85, 83, 49, 19, 48, 17, 6, 3, 85, 4, 8, 12, 10, 67, 97, 108, 105, 102, 111, 114, 110, 105, 97, 49, 20, 48, 18, 6, 3, 85, 4, 7, 12, 11, 76, 111, 115, 32, 65, 110, 103, 101, 108, 101, 115, 49, 19, 48, 17, 6, 3, 85, 4, 10, 12, 10, 73, 110, 100, 105, 118, 105, 100, 117, 97, 108, 49, 19, 48, 17, 6, 3, 85, 4, 11, 12, 10, 73, 110, 100, 105, 118, 105, 100, 117, 97, 108, 49, 26, 48, 24, 6, 3, 85, 4, 3, 12, 17, 80, 114, 111, 106, 101, 99, 116, 32, 83, 111, 97, 112, 115, 116, 111, 110, 101, 48, 30, 23, 13, 50, 52, 49, 48, 51, 49, 50, 49, 49, 52, 48, 57, 90, 23, 13, 51, 52, 49, 48, 50, 57, 50, 49, 49, 52, 48, 57, 90, 48, 126, 49, 11, 48, 9, 6, 3, 85, 4, 6, 19, 2, 85, 83, 49, 19, 48, 17, 6, 3, 85, 4, 8, 12, 10, 67, 97, 108, 105, 102, 111, 114, 110, 105, 97, 49, 20, 48, 18, 6, 3, 85, 4, 7, 12, 11, 76, 111, 115, 32, 65, 110, 103, 101, 108, 101, 115, 49, 19, 48, 17, 6, 3, 85, 4, 10, 12, 10, 73, 110, 100, 105, 118, 105, 100, 117, 97, 108, 49, 19, 48, 17, 6, 3, 85, 4, 11, 12, 10, 73, 110, 100, 105, 118, 105, 100, 117, 97, 108, 49, 26, 48, 24, 6, 3, 85, 4, 3, 12, 17, 80, 114, 111, 106, 101, 99, 116, 32, 83, 111, 97, 112, 115, 116, 111, 110, 101, 48, 130, 2, 34, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 1, 5, 0, 3, 130, 2, 15, 0, 48, 130, 2, 10, 2, 130, 2, 1, 0, 189, 16, 173, 116, 132, 107, 251, 95, 127, 28, 123, 118, 189, 186, 48, 236, 148, 254, 34, 200, 144, 225, 102, 29, 169, 2, 72, 186, 237, 249, 228, 187, 248, 128, 23, 126, 104, 122, 102, 184, 77, 207, 166, 101, 133, 67, 68, 166, 226, 84, 126, 96, 174, 211, 101, 35, 26, 34, 217, 202, 143, 152, 167, 71, 158, 56, 48, 42, 136, 193, 63, 73, 235, 31, 250, 53, 161, 183, 217, 158, 47, 248, 108, 238, 54, 159, 16, 51, 182, 27, 112, 69, 47, 177, 26, 204, 197, 31, 71, 168, 179, 48, 192, 161, 65, 201, 33, 207, 127, 107, 210, 47, 36, 223, 19, 246, 42, 169, 58, 183, 224, 81, 231, 154, 227, 81, 143, 212, 16, 150, 124, 167, 172, 167, 187, 210, 37, 55, 11, 119, 84, 184, 132, 209, 8, 182, 171, 7, 200, 206, 70, 225, 3, 181, 186, 90, 130, 201, 214, 234, 45, 202, 40, 215, 83, 136, 177, 212, 186, 90, 25, 57, 233, 176, 103, 36, 153, 86, 209, 199, 215, 4, 114, 109, 125, 125, 188, 149, 69, 134, 110, 58, 12, 27, 224, 126, 137, 197, 178, 107, 151, 205, 77, 124, 104, 176, 209, 67, 100, 126, 159, 133, 65, 108, 230, 46, 105, 179, 242, 107, 253, 232, 149, 73, 244, 109, 112, 99, 209, 62, 253, 3, 37, 20, 200, 5, 235, 104, 139, 186, 132, 107, 162, 60, 5, 180, 203, 10, 52, 65, 99, 97, 1, 152, 56, 92, 124, 157, 105, 29, 161, 251, 187, 119, 65, 27, 68, 152, 244, 212, 224, 173, 45, 145, 215, 65, 23, 6, 192, 124, 131, 52, 62, 230, 176, 212, 221, 10, 75, 224, 105, 165, 14, 166, 170, 151, 203, 199, 14, 10, 94, 36, 31, 165, 147, 185, 236, 86, 129, 79, 207, 121, 40, 247, 107, 111, 224, 177, 72, 139, 165, 57, 140, 69, 216, 145, 162, 72, 230, 153, 18, 103, 117, 63, 192, 77, 9, 84, 165, 101, 134, 194, 39, 17, 162, 82, 222, 194, 203, 100, 197, 2, 253, 41, 225, 152, 124, 146, 95, 114, 178, 64, 130, 202, 204, 8, 101, 42, 21, 84, 178, 190, 199, 12, 241, 196, 164, 35, 77, 157, 82, 48, 107, 229, 240, 103, 181, 194, 50, 85, 61, 127, 47, 178, 69, 143, 200, 48, 178, 40, 171, 32, 153, 225, 151, 62, 63, 52, 157, 229, 48, 143, 239, 238, 196, 135, 111, 102, 214, 94, 67, 34, 221, 147, 157, 233, 108, 59, 184, 107, 95, 133, 183, 187, 249, 13, 95, 217, 184, 83, 2, 12, 65, 75, 169, 68, 244, 161, 84, 31, 197, 96, 4, 124, 232, 37, 71, 143, 175, 147, 61, 130, 31, 165, 203, 143, 100, 162, 37, 199, 219, 106, 97, 32, 185, 173, 98, 192, 96, 88, 225, 197, 6, 242, 26, 28, 245, 34, 43, 77, 113, 232, 255, 105, 91, 213, 196, 40, 183, 98, 121, 130, 236, 54, 73, 229, 62, 87, 182, 204, 82, 135, 2, 3, 1, 0, 1, 163, 83, 48, 81, 48, 29, 6, 3, 85, 29, 14, 4, 22, 4, 20, 125, 57, 108, 237, 96, 208, 58, 71, 112, 44, 89, 201, 36, 124, 21, 71, 56, 77, 75, 96, 48, 31, 6, 3, 85, 29, 35, 4, 24, 48, 22, 128, 20, 125, 57, 108, 237, 96, 208, 58, 71, 112, 44, 89, 201, 36, 124, 21, 71, 56, 77, 75, 96, 48, 15, 6, 3, 85, 29, 19, 1, 1, 255, 4, 5, 48, 3, 1, 1, 255, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 11, 5, 0, 3, 130, 2, 1, 0, 153, 112, 98, 182, 18, 32, 236, 250, 175, 163, 127, 209, 24, 112, 129, 61, 107, 93, 236, 242, 92, 71, 240, 73, 53, 75, 14, 119, 154, 171, 42, 86, 83, 229, 231, 52, 161, 154, 2, 61, 182, 5, 38, 152, 14, 180, 219, 84, 25, 85, 98, 118, 31, 133, 106, 10, 209, 63, 220, 222, 128, 187, 251, 232, 173, 121, 89, 72, 96, 136, 56, 232, 80, 85, 96, 76, 0, 141, 119, 17, 108, 249, 83, 150, 209, 86, 239, 47, 233, 36, 146, 250, 58, 148, 13, 84, 250, 190, 128, 162, 40, 97, 115, 70, 9, 103, 81, 172, 12, 120, 65, 180, 87, 38, 88, 8, 244, 134, 162, 15, 236, 61, 209, 211, 139, 29, 2, 17, 121, 112, 26, 253, 132, 97, 120, 31, 223, 10, 98, 11, 235, 35, 78, 131, 48, 49, 150, 99, 42, 212, 20, 236, 149, 241, 162, 165, 35, 154, 16, 106, 89, 180, 161, 242, 128, 104, 193, 221, 225, 51, 215, 146, 132, 62, 87, 201, 70, 236, 247, 217, 44, 68, 71, 33, 243, 17, 67, 49, 12, 104, 186, 79, 40, 213, 75, 132, 146, 163, 88, 57, 118, 143, 245, 117, 225, 102, 114, 130, 106, 32, 216, 239, 212, 123, 231, 49, 11, 122, 99, 226, 48, 57, 239, 118, 151, 217, 254, 81, 173, 60, 233, 52, 56, 164, 209, 248, 197, 251, 168, 76, 0, 47, 5, 1, 99, 167, 63, 244, 215, 62, 50, 213, 167, 224, 165, 136, 163, 231, 215, 143, 208, 105, 156, 223, 221, 166, 64, 227, 48, 231, 60, 152, 2, 171, 69, 158, 207, 130, 131, 57, 37, 200, 59, 20, 171, 190, 213, 50, 210, 188, 34, 153, 64, 193, 31, 205, 170, 89, 54, 209, 239, 93, 146, 76, 96, 246, 214, 121, 44, 35, 225, 28, 132, 153, 153, 102, 209, 127, 61, 201, 90, 185, 58, 184, 41, 112, 247, 94, 88, 245, 198, 5, 34, 147, 54, 203, 204, 171, 39, 66, 93, 98, 210, 226, 136, 67, 105, 252, 204, 203, 249, 158, 144, 199, 87, 41, 185, 13, 167, 99, 131, 124, 107, 142, 76, 73, 223, 97, 61, 106, 23, 145, 236, 13, 24, 119, 141, 39, 47, 250, 81, 176, 84, 182, 188, 23, 27, 37, 227, 162, 253, 159, 239, 23, 63, 100, 252, 199, 238, 136, 244, 189, 139, 143, 20, 159, 240, 119, 94, 116, 203, 154, 45, 229, 26, 191, 62, 169, 101, 135, 31, 210, 103, 159, 80, 170, 39, 1, 12, 60, 151, 100, 53, 202, 86, 57, 183, 138, 56, 208, 99, 131, 7, 72, 185, 150, 215, 207, 93, 227, 11, 23, 116, 143, 156, 91, 11, 76, 4, 42, 217, 177, 7, 205, 154, 92, 107, 218, 109, 153, 168, 221, 125, 98, 111, 0, 24, 56, 150, 67, 158, 106, 106, 217, 48, 194, 54, 220, 76, 81, 202, 136, 207, 156, 121, 74, 3, 246, 55, 151, 193, 169, 133, 215, 15, 209, 125, 4, 240, 141, 34, 79 };
 
+		// may throw a ParseException if the file at _credentialPath is invalid
 		public Client(string _credentialPath, string _cachePath) {
 			credentialPath = _credentialPath;
 			cachePath = _cachePath;
@@ -90,13 +120,13 @@ namespace Soapstone {
 					if (line != null && line.Length >= 3 && line.Length <= 64) {
 						Username = line;
 					} else {
-						throw new Exception("Invalid stored username.");
+						throw new ParseException("Invalid stored username.");
 					}
 					line = stream.ReadLine();
 					if (line != null && line.Length >= 8 && line.Length <= 72) {
 						Password = line;
 					} else {
-						throw new Exception("Invalid stored password.");
+						throw new ParseException("Invalid stored password.");
 					}
 				}
 			}
@@ -116,6 +146,21 @@ namespace Soapstone {
 			client = new HttpClient(handler) {
 				BaseAddress = new Uri(host)
 			};
+		}
+
+		static public void EnsureSuccess(HttpStatusCode status) {
+			switch (status) {
+				case HttpStatusCode.OK:
+					return;
+				case HttpStatusCode.BadRequest:
+					throw new BadRequestException();
+				case HttpStatusCode.TooManyRequests:
+					throw new RateLimitException();
+				case HttpStatusCode.Unauthorized:
+					throw new NotLoggedInException();
+				default:
+					throw new Exception($"Fatal status code {status}.");
+			}
 		}
 
 		private void writeUser() {
@@ -185,19 +230,20 @@ namespace Soapstone {
 			using (var stream = new StreamReader(File.OpenRead(cachePath))) {
 				string? line = stream.ReadLine();
 				if (line == null) {
-					throw new Exception("Invalid cache.");
+					throw new ParseException("Invalid cache.");
 				}
 				uint requiredVersion = Convert.ToUInt32(line);
 				if (requiredVersion != version) {
-					throw new Exception("Invalid version.");
+					throw new ParseException("Invalid version.");
 				}
 				Decoder = parseTable(stream);
 			}
 		}
 
 		public async Task UpdateTable() {
+			await Version();
 			try {
-				readCache(await Version());
+				readCache(ServerVersion);
 				return;
 			} catch (Exception e) {
 				Console.WriteLine($"Bad cache: {e.Message}\nCreating a new cache at {cachePath}");
@@ -212,11 +258,11 @@ namespace Soapstone {
 
 		public async Task<uint> Version() {
 			HttpResponseMessage resp = await client.GetAsync("/version");
-			resp.EnsureSuccessStatusCode();
+			EnsureSuccess(resp.StatusCode);
 			using (var stream = await resp.Content.ReadAsStreamAsync()) {
 				var buf = new byte[4];
 				if (await stream.ReadAsync(buf, 0, buf.Length) != buf.Length) {
-					throw new InvalidOperationException("Server response is too short.");
+					throw new ParseException("Server response is too short.");
 				}
 				uint res = BitConverter.ToUInt32(buf, 0);
 				ServerVersion = res;
@@ -226,7 +272,7 @@ namespace Soapstone {
 
 		public async Task Table() {
 			HttpResponseMessage resp = await client.GetAsync("/table");
-			resp.EnsureSuccessStatusCode();
+			EnsureSuccess(resp.StatusCode);
 			using (var stream = new StreamReader(await resp.Content.ReadAsStreamAsync())) {
 				StringDecoder decoder = parseTable(stream);
 				for (int i = 0; i < decoder.Templates.Count; i++) {
@@ -238,14 +284,14 @@ namespace Soapstone {
 
 		private async Task Login() {
 			HttpResponseMessage resp = await client.GetAsync($"/login?name={Uri.EscapeDataString(Username!)}&password={Uri.EscapeDataString(Password!)}");
-			resp.EnsureSuccessStatusCode();
+			EnsureSuccess(resp.StatusCode);
 		}
 
 		private async Task Register() {
 			using (var rng = RandomNumberGenerator.Create()) {
-				// we'll use the first 20 for the password, and the last for the username
 				int triesLeft = 20;
 				while (true) {
+					// we'll use the first 20 for the password, and the last for the username
 					var buf = new byte[40];
 					rng.GetBytes(buf);
 					// yes, this makes it slightly less random, but not less secure
@@ -261,7 +307,8 @@ namespace Soapstone {
 						if (triesLeft-- == 0)
 							throw new Exception("Too many failed attempts to register.");
 					} else {
-						throw new HttpRequestException("Fatal status code.");
+						// let's throw something
+						EnsureSuccess(resp.StatusCode);
 					}
 				}
 				writeUser();
