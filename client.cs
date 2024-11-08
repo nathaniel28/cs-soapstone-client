@@ -8,6 +8,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Soapstone {
+	// If a NotLoggedInException makes its way up to your code,
+	// then you can assume the client already tried to Login()
+	// It's then up to you to decide whether or not to re-register
 	[Serializable]
 	public class NotLoggedInException : Exception {
 		public NotLoggedInException() {}
@@ -15,6 +18,10 @@ namespace Soapstone {
 		public NotLoggedInException(string what, Exception inner) : base(what, inner) {}
 	}
 
+	// Don't make any API calls for the next 20 seconds. Exceeding more
+	// than 1 API call per second is not sustainable.
+	// Please catch this, report to the user,
+	// and temporarily block API calls
 	[Serializable]
 	public class RateLimitException : Exception {
 		public RateLimitException() {}
@@ -22,6 +29,9 @@ namespace Soapstone {
 		public RateLimitException(string what, Exception inner) : base(what, inner) {}
 	}
 
+	// This one is context dependent. It means whatever you just called had
+	// content associated with it, but that content was malformed.
+	// Recovery is possible, and probably just means throwing out the old
 	[Serializable]
 	public class ParseException : Exception {
 		public ParseException() {}
@@ -29,7 +39,7 @@ namespace Soapstone {
 		public ParseException(string what, Exception inner) : base(what, inner) {}
 	}
 
-	// don't try to recover from this one
+	// Don't bother trying to recover from this one
 	// this means there's a serious bug in this namespace
 	[Serializable]
 	public class BadRequestException : Exception {
@@ -38,6 +48,10 @@ namespace Soapstone {
 		public BadRequestException(string what, Exception inner) : base(what, inner) {}
 	}
 
+	// This only occurs on a Write API call
+	// It means the user has written so many messages that the server won't
+	// save any more of theirs. Report to the user that they must delete
+	// one of their messages in order to write one more.
 	[Serializable]
 	public class TooManyMessagesException : Exception {
 		public TooManyMessagesException() {}
@@ -45,6 +59,9 @@ namespace Soapstone {
 		public TooManyMessagesException(string what, Exception inner) : base(what, inner) {}
 	}
 
+	// The raw Message is probably of no use to you
+	// Please pass it to StringDecoder.DecodeMessage
+	// Client will have a StringDeocder for you in the member Decoder
 	[StructLayout(LayoutKind.Sequential, Pack = 4)]
 	public struct Message {
 		public uint Id;
@@ -79,6 +96,10 @@ namespace Soapstone {
 		}
 	}
 
+	// TODO: name sucks
+	// From what I understand, Hollow Knight uses strings to identify rooms
+	// Messages require a number to write. So, this can also encode room
+	// names to room numbers. Mind the KeyNotFoundException.
 	public struct StringDecoder {
 		public List<string> Templates;
 		public List<string> Conjunctions;
