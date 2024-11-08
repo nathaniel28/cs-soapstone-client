@@ -11,6 +11,7 @@ namespace Soapstone {
 	// If a NotLoggedInException makes its way up to your code,
 	// then you can assume the client already tried to Login()
 	// It's then up to you to decide whether or not to re-register
+	// Thrown when the server returns a status code of 401
 	[Serializable]
 	public class NotLoggedInException : Exception {
 		public NotLoggedInException() {}
@@ -22,6 +23,7 @@ namespace Soapstone {
 	// than 1 API call per second is not sustainable.
 	// Please catch this, report to the user,
 	// and temporarily block API calls
+	// Thrown when the server returns a status code of 429
 	[Serializable]
 	public class RateLimitException : Exception {
 		public RateLimitException() {}
@@ -40,7 +42,9 @@ namespace Soapstone {
 	}
 
 	// Don't bother trying to recover from this one
-	// this means there's a serious bug in this namespace
+	// this means there's a bug in your code or this code
+	// You should carefully examine what caused this.
+	// Thrown when the server returns a status code of 400
 	[Serializable]
 	public class BadRequestException : Exception {
 		public BadRequestException() {}
@@ -48,10 +52,11 @@ namespace Soapstone {
 		public BadRequestException(string what, Exception inner) : base(what, inner) {}
 	}
 
-	// This only occurs on a Write API call
+	// This only occurs on a Write API call only
 	// It means the user has written so many messages that the server won't
 	// save any more of theirs. Report to the user that they must delete
 	// one of their messages in order to write one more.
+	// Thrown when the server returns a status code of 409
 	[Serializable]
 	public class TooManyMessagesException : Exception {
 		public TooManyMessagesException() {}
@@ -195,7 +200,7 @@ namespace Soapstone {
 			};
 		}
 
-		static public void EnsureSuccess(HttpStatusCode status) {
+		static private void ensureSuccess(HttpStatusCode status) {
 			switch (status) {
 				case HttpStatusCode.OK:
 					return;
@@ -302,11 +307,11 @@ namespace Soapstone {
 		}
 
 		// C# wrappers for API calls to follow
-		// All can throw what EnsureSuccess can
+		// All can throw what ensureSuccess can
 
 		public async Task<uint> Version() {
 			HttpResponseMessage resp = await client.GetAsync("/version");
-			EnsureSuccess(resp.StatusCode);
+			ensureSuccess(resp.StatusCode);
 			using (var stream = await resp.Content.ReadAsStreamAsync()) {
 				var buf = new byte[4];
 				if (await stream.ReadAsync(buf, 0, buf.Length) != buf.Length) {
@@ -320,7 +325,7 @@ namespace Soapstone {
 
 		public async Task Table() {
 			HttpResponseMessage resp = await client.GetAsync("/table");
-			EnsureSuccess(resp.StatusCode);
+			ensureSuccess(resp.StatusCode);
 			using (var stream = new StreamReader(await resp.Content.ReadAsStreamAsync())) {
 				StringDecoder decoder = parseTable(stream);
 				for (int i = 0; i < decoder.Templates.Count; i++) {
@@ -332,7 +337,7 @@ namespace Soapstone {
 
 		private async Task Login() {
 			HttpResponseMessage resp = await client.GetAsync($"/login?name={Uri.EscapeDataString(Username!)}&password={Uri.EscapeDataString(Password!)}");
-			EnsureSuccess(resp.StatusCode);
+			ensureSuccess(resp.StatusCode);
 		}
 
 		private async Task Register() {
@@ -356,7 +361,7 @@ namespace Soapstone {
 							throw new Exception("Too many failed attempts to register.");
 					} else {
 						// let's throw something
-						EnsureSuccess(resp.StatusCode);
+						ensureSuccess(resp.StatusCode);
 					}
 				}
 				writeUser();
@@ -402,7 +407,7 @@ namespace Soapstone {
 
 		private async Task<List<Message>> fromMessageStream(string queryString) {
 			HttpResponseMessage resp = await client.GetAsync(queryString);
-			EnsureSuccess(resp.StatusCode);
+			ensureSuccess(resp.StatusCode);
 			var res = new List<Message>();
 			using (var stream = new BinaryReader(await resp.Content.ReadAsStreamAsync())) {
 				while (true) {
@@ -425,6 +430,7 @@ namespace Soapstone {
 			return await fromMessageStream($"/query?room={Decoder.EncodeRoom(roomName)}");
 		}
 
+		// May throw KeyNotFoundException given an invalid or unsupported roomName
 		public async Task<List<Message>> Mine() {
 			try {
 				return await fromMessageStream("/mine");
@@ -432,6 +438,15 @@ namespace Soapstone {
 				await Login();
 				return await fromMessageStream("/mine");
 			}
+		}
+
+		// make sure to supply an id of a message you wrote (you can
+		// see everything you wrote with Mine()). Attempting to delete
+		// someone else's message will throw an exception, not meant to
+		// be caught.
+		public async Task Erase(uint id) {
+			HttpResponseMessage resp = await client.GetAsync($"/erase?id={id}");
+			ensureSuccess(resp.StatusCode);
 		}
 	}
 }
