@@ -64,6 +64,13 @@ namespace Soapstone {
 		public TooManyMessagesException(string what, Exception inner) : base(what, inner) {}
 	}
 
+	[Serializable]
+	public class AlreadyVotedException : Exception {
+		public AlreadyVotedException() {}
+		public AlreadyVotedException(string what) : base(what) {}
+		public AlreadyVotedException(string what, Exception inner) : base(what, inner) {}
+	}
+
 	// The raw Message is probably of no use to you
 	// Please pass it to StringDecoder.DecodeMessage
 	// Client will have a StringDeocder for you in the member Decoder
@@ -299,7 +306,7 @@ namespace Soapstone {
 				return;
 			} catch (Exception e) {
 				Console.WriteLine($"Bad cache: {e.Message}\nCreating a new cache at {cachePath}");
-				// cache was invalid, outdated, or nonexistant
+				// cache was invalid, outdated, or nonexistent
 				// in any case, ask the server for an updated Decoder
 				await Table();
 				writeCache();
@@ -315,6 +322,12 @@ namespace Soapstone {
 		// NOTE: Yes, you should catch and handle KeyNotFoundException,
 		// for example, if the user has mods with new rooms it will be
 		// thrown when they enter one.
+		// NOTE: Why do all methods that require being logged in catch
+		// NotLoggedInException? Because the server can expire your
+		// token after an hour. This means you should not call Login()
+		// yourself after a NotLoggedInException, since that was already
+		// tried and failed to have an effect if the exception was again
+		// thrown.
 
 		// Throws nothing you can recover from.
 		public async Task<uint> Version() {
@@ -453,6 +466,29 @@ namespace Soapstone {
 			return res;
 		}
 
+		// Throws AlreadyVotedException if the user has already voted
+		// on the messageId provided. This result should be cached,
+		// perhaps permanently. Alternatively, it should be avoided in
+		// the first place by keeping a set of message ids the user has
+		// voted on. The latter is the cleaner option.
+		public async Task Vote(uint messageId, bool like) {
+			Console.WriteLine(messageId);
+			string vt = like ? "like" : "dislike";
+			string q = $"/vote?id={messageId}&type={vt}";
+			HttpResponseMessage resp = await client.GetAsync(q);
+			if (resp.StatusCode == HttpStatusCode.Conflict)
+				throw new AlreadyVotedException();
+			try {
+				ensureSuccess(resp.StatusCode);
+			} catch (NotLoggedInException) {
+				await Login();
+				resp = await client.GetAsync(q);
+				if (resp.StatusCode == HttpStatusCode.Conflict)
+					throw new AlreadyVotedException();
+				ensureSuccess(resp.StatusCode);
+			}
+		}
+
 		// Throws KeyNotFoundException given an unsupported roomName.
 		public async Task<List<Message>> Query(string roomName) {
 			return await fromMessageStream($"/query?room={Decoder.EncodeRoom(roomName)}");
@@ -472,11 +508,12 @@ namespace Soapstone {
 		// Make sure to supply an id of a message you wrote (you can
 		// see everything you wrote with Mine()).
 		public async Task Erase(uint id) {
-			HttpResponseMessage resp = await client.GetAsync($"/erase?id={id}");
+			string q = $"/erase?id={id}";
+			HttpResponseMessage resp = await client.GetAsync(q);
 			try {
 				ensureSuccess(resp.StatusCode);
 			} catch (NotLoggedInException) {
-				resp = await client.GetAsync($"/erase?id={id}");
+				resp = await client.GetAsync(q);
 				ensureSuccess(resp.StatusCode);
 			}
 		}
