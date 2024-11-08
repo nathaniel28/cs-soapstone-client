@@ -37,6 +37,14 @@ namespace Soapstone {
 		public BadRequestException(string what) : base(what) {}
 		public BadRequestException(string what, Exception inner) : base(what, inner) {}
 	}
+
+	[Serializable]
+	public class TooManyMessagesException : Exception {
+		public TooManyMessagesException() {}
+		public TooManyMessagesException(string what) : base(what) {}
+		public TooManyMessagesException(string what, Exception inner) : base(what, inner) {}
+	}
+
 	[StructLayout(LayoutKind.Sequential, Pack = 4)]
 	public struct Message {
 		public uint Id;
@@ -51,6 +59,24 @@ namespace Soapstone {
 		public byte Template2;
 		public byte Conjunction;
 		private byte pad0, pad1, pad2;
+
+		public Message() {}
+
+		// caller should discard padding if it exists
+		public Message(BinaryReader stream) {
+			// what happened to read(fd, &s, sizeof(s))?
+			Id = stream.ReadUInt32();
+			Likes = stream.ReadUInt32();
+			Dislikes = stream.ReadUInt32();
+			Room = stream.ReadUInt16();
+			X = stream.ReadUInt16();
+			Y = stream.ReadUInt16();
+			Word1 = stream.ReadUInt16();
+			Word2 = stream.ReadUInt16();
+			Template1 = stream.ReadByte();
+			Template2 = stream.ReadByte();
+			Conjunction = stream.ReadByte();
+		}
 	}
 
 	public struct StringDecoder {
@@ -63,7 +89,7 @@ namespace Soapstone {
 		public string DecodeMessage(Message msg) {
 			string res = string.Format(Templates[msg.Template1], Words[msg.Word1]);
 			if (msg.Conjunction != 255) {
-				res += string.Format(Templates[msg.Template2], Words[msg.Word2]);
+				res += $" {Conjunctions[msg.Conjunction]} {string.Format(Templates[msg.Template2], Words[msg.Word2])}";
 			}
 			return res;
 		}
@@ -241,9 +267,9 @@ namespace Soapstone {
 		}
 
 		public async Task UpdateTable() {
-			await Version();
+			uint v = await Version();
 			try {
-				readCache(ServerVersion);
+				readCache(v);
 				return;
 			} catch (Exception e) {
 				Console.WriteLine($"Bad cache: {e.Message}\nCreating a new cache at {cachePath}");
@@ -255,6 +281,7 @@ namespace Soapstone {
 		}
 
 		// C# wrappers for API calls to follow
+		// All can throw what EnsureSuccess can
 
 		public async Task<uint> Version() {
 			HttpResponseMessage resp = await client.GetAsync("/version");
@@ -323,7 +350,8 @@ namespace Soapstone {
 			await Login();
 		}
 
-		// May throw KeyNotFoundException given an invalid roomName
+		// May throw KeyNotFoundException given an invalid or unsupported roomName
+		// May throw TooManyMessagesException if the server is not willing to save any more of this user's messages
 		public async Task Write(string roomName, ushort x, ushort y, byte template1, ushort word1, byte conjunction, byte template2, ushort word2) {
 			string q = $"/write?room={Decoder.EncodeRoom(roomName)}&x={x}&y={y}&t1={template1}&w1={word1}";
 			if (conjunction != 255) {
@@ -341,15 +369,48 @@ namespace Soapstone {
 						goto default;
 					break; // if break is required why is implicit fallthrough disallowed? C# is weird
 				case HttpStatusCode.Conflict:
-					// TODO, throw an exception that reports the
-					// user having too many messages to add new ones
+					throw new TooManyMessagesException();
 				default:
-					throw new HttpRequestException("Fatal status code.");
+					throw new Exception($"Fatal status code {resp.StatusCode}.");
 			}
 		}
 
 		public async Task Write(string roomName, ushort x, ushort y, byte template1, ushort word1) {
 			await Write(roomName, x, y, template1, word1, 255, 0, 0);
+		}
+
+		private async Task<List<Message>> fromMessageStream(string queryString) {
+			HttpResponseMessage resp = await client.GetAsync(queryString);
+			EnsureSuccess(resp.StatusCode);
+			var res = new List<Message>();
+			using (var stream = new BinaryReader(await resp.Content.ReadAsStreamAsync())) {
+				while (true) {
+					try {
+						res.Add(new Message(stream));
+						// discard padding-- see API docs for why
+						stream.ReadByte();
+						stream.ReadByte();
+						stream.ReadByte();
+					} catch (EndOfStreamException) {
+						break;
+					}
+				}
+			}
+			return res;
+		}
+
+		// May throw KeyNotFoundException given an invalid or unsupported roomName
+		public async Task<List<Message>> Query(string roomName) {
+			return await fromMessageStream($"/query?room={Decoder.EncodeRoom(roomName)}");
+		}
+
+		public async Task<List<Message>> Mine() {
+			try {
+				return await fromMessageStream("/mine");
+			} catch (NotLoggedInException) {
+				await Login();
+				return await fromMessageStream("/mine");
+			}
 		}
 	}
 }
