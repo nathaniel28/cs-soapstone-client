@@ -307,8 +307,16 @@ namespace Soapstone {
 		}
 
 		// C# wrappers for API calls to follow
-		// All can throw what ensureSuccess can
+		// All can throw many things. Please carefully read the comment
+		// above each to know what you should catch and handle.
+		// Additionally, all can throw RateLimitException.
+		// On an uncrecoverable error, the optimal solution is to report
+		// it to the user and shut down the mod, but keep the game alive
+		// NOTE: Yes, you should catch and handle KeyNotFoundException,
+		// for example, if the user has mods with new rooms it will be
+		// thrown when they enter one.
 
+		// Throws nothing you can recover from.
 		public async Task<uint> Version() {
 			HttpResponseMessage resp = await client.GetAsync("/version");
 			ensureSuccess(resp.StatusCode);
@@ -323,6 +331,7 @@ namespace Soapstone {
 			}
 		}
 
+		// Throws nothing you can recover from.
 		public async Task Table() {
 			HttpResponseMessage resp = await client.GetAsync("/table");
 			ensureSuccess(resp.StatusCode);
@@ -335,12 +344,27 @@ namespace Soapstone {
 			}
 		}
 
-		private async Task Login() {
+		// Throws NotLoggedInException if the credentials provided are
+		// invalid. This is a pretty dire error. The fix is probably
+		// deleting the current account and creating a new one. Call
+		// Register() to to achieve this. The user should be notified
+		// before action is taken on their account.
+		// NOTE: You should not call this function unless you **really**
+		// know what you're doing. LoginOrRegister() is what you're
+		// probably looking for.
+		public async Task Login() {
 			HttpResponseMessage resp = await client.GetAsync($"/login?name={Uri.EscapeDataString(Username!)}&password={Uri.EscapeDataString(Password!)}");
 			ensureSuccess(resp.StatusCode);
 		}
 
-		private async Task Register() {
+		// This interally handles username/password creation.
+		// Throws nothing you can recover from.
+		// Still can throw unrecoverable errors.
+		// NOTE: This function will overwrite the current account!
+		// NOTE: You should not call this function unless you **really**
+		// know what you're doing. LoginOrRegister() is what you're
+		// probably looking for.
+		public async Task Register() {
 			using (var rng = RandomNumberGenerator.Create()) {
 				int triesLeft = 20;
 				while (true) {
@@ -368,6 +392,7 @@ namespace Soapstone {
 			}
 		}
 
+		// Handle what Login() can throw
 		public async Task LoginOrRegister() {
 			// Username and Password may have been set by the constructor
 			if (Username == null) {
@@ -376,8 +401,10 @@ namespace Soapstone {
 			await Login();
 		}
 
-		// May throw KeyNotFoundException given an invalid or unsupported roomName
-		// May throw TooManyMessagesException if the server is not willing to save any more of this user's messages
+		// Throws KeyNotFoundException given an unsupported roomName.
+		// Throw TooManyMessagesException if the server is not willing
+		// to save any more of this user's messages. This should be
+		// reported to the user.
 		public async Task Write(string roomName, ushort x, ushort y, byte template1, ushort word1, byte conjunction, byte template2, ushort word2) {
 			string q = $"/write?room={Decoder.EncodeRoom(roomName)}&x={x}&y={y}&t1={template1}&w1={word1}";
 			if (conjunction != 255) {
@@ -401,6 +428,7 @@ namespace Soapstone {
 			}
 		}
 
+		// See the other Write method for what to handle
 		public async Task Write(string roomName, ushort x, ushort y, byte template1, ushort word1) {
 			await Write(roomName, x, y, template1, word1, 255, 0, 0);
 		}
@@ -425,12 +453,12 @@ namespace Soapstone {
 			return res;
 		}
 
-		// May throw KeyNotFoundException given an invalid or unsupported roomName
+		// Throws KeyNotFoundException given an unsupported roomName.
 		public async Task<List<Message>> Query(string roomName) {
 			return await fromMessageStream($"/query?room={Decoder.EncodeRoom(roomName)}");
 		}
 
-		// May throw KeyNotFoundException given an invalid or unsupported roomName
+		// Throws nothing you can recover from.
 		public async Task<List<Message>> Mine() {
 			try {
 				return await fromMessageStream("/mine");
@@ -440,13 +468,17 @@ namespace Soapstone {
 			}
 		}
 
-		// make sure to supply an id of a message you wrote (you can
-		// see everything you wrote with Mine()). Attempting to delete
-		// someone else's message will throw an exception, not meant to
-		// be caught.
+		// Throws nothing you can recover from.
+		// Make sure to supply an id of a message you wrote (you can
+		// see everything you wrote with Mine()).
 		public async Task Erase(uint id) {
 			HttpResponseMessage resp = await client.GetAsync($"/erase?id={id}");
-			ensureSuccess(resp.StatusCode);
+			try {
+				ensureSuccess(resp.StatusCode);
+			} catch (NotLoggedInException) {
+				resp = await client.GetAsync($"/erase?id={id}");
+				ensureSuccess(resp.StatusCode);
+			}
 		}
 	}
 }
